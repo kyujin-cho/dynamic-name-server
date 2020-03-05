@@ -1,0 +1,11 @@
+networks:
+- cidr: 192.168.1.0/24
+  rules:
+    exmaple.domain.: 192.168.1.23
+    example2.domain.: 192.168.1.45
+- cidr: 172.24.0.0/16
+  rules:
+    exmaple.domain.: 172.24.15.9
+adapter: Wi-Fi
+port: 53
+protocol: udp
