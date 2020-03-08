@@ -56,16 +56,48 @@ func logIfErr(e error) {
 	}
 }
 
+func printAdapters() error {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			return err
+		}
+		for _, addr := range addrs {
+			switch v := addr.(type) {
+			case *net.IPNet:
+				if v.IP.To4() != nil {
+					fmt.Printf("%s: %s\n", i.Name, addr.String())
+					continue
+				}
+			case *net.IPAddr:
+				if v.IP.To4() != nil {
+					fmt.Printf("%s: %s\n", i.Name, addr.String())
+					continue
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func getIPAddress(config Config) (*net.IP, error) {
 	ifaces, err := net.Interfaces()
-	panicIfErr(err)
+	if err != nil {
+		return nil, err
+	}
 	for _, i := range ifaces {
 		if config.DefaultAdapter != "" && config.DefaultAdapter != i.Name {
 			continue
 		}
 
 		addrs, err := i.Addrs()
-		panicIfErr(err)
+		if err != nil {
+			return nil, err
+		}
 		for _, addr := range addrs {
 			switch v := addr.(type) {
 			case *net.IPNet:
@@ -99,7 +131,10 @@ func parseQuery(m *dns.Msg, config Config) {
 			hit := false
 			for _, network := range config.Networks {
 				contains, err := network.Ranger.Contains(*ip)
-				panicIfErr(err)
+				if err != nil {
+					log.Fatal(err)
+					continue
+				}
 				if contains && network.Rules[q.Name] != "" {
 					ip := network.Rules[q.Name]
 					recordType := "A"
@@ -107,7 +142,10 @@ func parseQuery(m *dns.Msg, config Config) {
 						recordType = "AAAA"
 					}
 					rr, err := dns.NewRR(fmt.Sprintf("%s %s %s", q.Name, recordType, ip))
-					panicIfErr(err)
+					if err != nil {
+						log.Fatal(err)
+						break
+					}
 					m.Answer = append(m.Answer, rr)
 					if !config.Nolog {
 						log.Printf("[%s] %s\n", ipStr, rr.String())
@@ -122,17 +160,23 @@ func parseQuery(m *dns.Msg, config Config) {
 			}
 			if !hit {
 				ips, err := net.LookupIP(q.Name)
-				panicIfErr(err)
-				for _, ip := range ips {
-					recordType := "A"
-					if ip.To4() == nil {
-						recordType = "AAAA"
-					}
-					rr, err := dns.NewRR(fmt.Sprintf("%s %s %s", q.Name, recordType, ip))
-					panicIfErr(err)
-					m.Answer = append(m.Answer, rr)
-					if !config.Nolog {
-						log.Printf("[%s] %s\n", ipStr, rr.String())
+				if err != nil {
+					log.Fatal(err)
+				} else {
+					for _, ip := range ips {
+						recordType := "A"
+						if ip.To4() == nil {
+							recordType = "AAAA"
+						}
+						rr, err := dns.NewRR(fmt.Sprintf("%s %s %s", q.Name, recordType, ip))
+						if err != nil {
+							log.Fatal(err)
+							break
+						}
+						m.Answer = append(m.Answer, rr)
+						if !config.Nolog {
+							log.Printf("[%s] %s\n", ipStr, rr.String())
+						}
 					}
 				}
 			}
@@ -158,8 +202,14 @@ func main() {
 	panicIfErr(err)
 	defaultConfigPath := path.Join(homeDir, ".config", "selective-dns-query.yml")
 	configPath := flag.String("config", defaultConfigPath, "Path for config file")
-	nolog := flag.Bool("quiet", false, "If specified, do not print query log")
+	nolog := flag.Bool("quiet", false, "Do not print information about query")
+	doPrintAdapters := flag.Bool("adapters", false, "Print all available network adapters and exit")
 	flag.Parse()
+
+	if *doPrintAdapters {
+		printAdapters()
+		return
+	}
 
 	dat, err := ioutil.ReadFile(*configPath)
 	panicIfErr(err)
