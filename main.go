@@ -132,7 +132,7 @@ func parseQuery(m *dns.Msg, config Config) {
 			for _, network := range config.Networks {
 				contains, err := network.Ranger.Contains(*ip)
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
 					continue
 				}
 				if contains && network.Rules[q.Name] != "" {
@@ -143,7 +143,7 @@ func parseQuery(m *dns.Msg, config Config) {
 					}
 					rr, err := dns.NewRR(fmt.Sprintf("%s %s %s", q.Name, recordType, ip))
 					if err != nil {
-						log.Fatal(err)
+						log.Print(err)
 						break
 					}
 					m.Answer = append(m.Answer, rr)
@@ -161,7 +161,7 @@ func parseQuery(m *dns.Msg, config Config) {
 			if !hit {
 				ips, err := net.LookupIP(q.Name)
 				if err != nil {
-					log.Fatal(err)
+					log.Print(err)
 				} else {
 					for _, ip := range ips {
 						recordType := "A"
@@ -170,7 +170,7 @@ func parseQuery(m *dns.Msg, config Config) {
 						}
 						rr, err := dns.NewRR(fmt.Sprintf("%s %s %s", q.Name, recordType, ip))
 						if err != nil {
-							log.Fatal(err)
+							log.Print(err)
 							break
 						}
 						m.Answer = append(m.Answer, rr)
